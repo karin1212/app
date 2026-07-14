@@ -18,7 +18,7 @@ let rainFilter;
 let bgImage;
 
 function preload() {
-  bgImage = loadImage('campfire.jpg');
+  bgImage = loadImage('fire.jpg');
 }
 
 // 他のユーザーのタスククラス
