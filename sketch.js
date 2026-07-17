@@ -1,4 +1,4 @@
-// === p5.js：焚き火を囲む・5分間マシュマロ共有タイマー ===
+// === p5.js：焚き火を囲む・5分間マシュマロ焼きタイマー（位置固定版） ===
 
 let taskInput;
 let startButton;
@@ -17,17 +17,20 @@ let bgImage;
 
 // 焚き火の中心座標
 let fireX, fireY;
+// マシュマロを固定する焚き火からの距離（半径）
+let fixedRadius = 80;
 
 function preload() {
+  // 以前の指示通り、ご用意した画像を読み込んでください
   bgImage = loadImage('fire2.png');
 }
 
-// 他のユーザーのタスク（焚き火を囲むマシュマロ）
+// 他のユーザーのタスク（固定位置で焼いているマシュマロ）
 class OtherUserTask {
   constructor(text, angle, isInitial = false) {
     this.text = text;
     this.timer = totalDuration;
-    this.angle = angle; // 焚き火を囲む角度（ラジアン）
+    this.angle = angle; // 焚き火を囲む固定の角度
 
     if (isInitial) {
       this.timer = random(1000, totalDuration);
@@ -39,29 +42,26 @@ class OtherUserTask {
   }
 
   display() {
+    // 位置は動かない（fixedRadius で固定）
     let progress = (totalDuration - this.timer) / totalDuration;
 
-    // 5分かけて外側（半径220px）から内側（半径70px）へ近づく
-    let currentRadius = lerp(220, 70, progress);
+    // 円形の座標計算
+    let x = fireX + cos(this.angle) * fixedRadius;
+    let y = fireY + sin(this.angle) * fixedRadius;
 
-    // 円形の座標計算（三角関数：チャプター12の応用）
-    let x = fireX + cos(this.angle) * currentRadius;
-    let y = fireY + sin(this.angle) * currentRadius;
-
-    // ゆらゆらと風に揺れる動きを追加
-    let swing = sin(frameCount * 0.015 + this.angle) * 8;
+    // その場で小さくゆらゆら揺れる癒やしの動き
+    let swing = sin(frameCount * 0.015 + this.angle) * 5;
     let finalX = x + cos(this.angle + HALF_PI) * swing;
     let finalY = y + sin(this.angle + HALF_PI) * swing;
 
-    // 1. 串を描画（焚き火の中心からマシュマロに向けて伸びる）
+    // 1. 串を描画（外側の持ち手からマシュマロへ一直線）
     stroke(115, 74, 18);
     strokeWeight(2);
-    // 画面外（または持ち手側）から中央に向けて串を引く
-    let handX = fireX + cos(this.angle) * 260;
-    let handY = fireY + sin(this.angle) * 260;
+    let handX = fireX + cos(this.angle) * 240;
+    let handY = fireY + sin(this.angle) * 240;
     line(handX, handY, finalX, finalY);
 
-    // 2. 焼き色の計算
+    // 2. その場でじわじわ変わる焼き色の計算
     let r = lerp(255, 139, progress);
     let g = lerp(255, 90, progress);
     let b = lerp(255, 43, progress);
@@ -69,20 +69,20 @@ class OtherUserTask {
     // 3. ミニマシュマロ
     push();
     translate(finalX, finalY);
-    rotate(this.angle); // 焚き火の方向に向かせる
+    rotate(this.angle);
     noStroke();
     fill(r, g, b);
     rectMode(CENTER);
     rect(0, 0, 22, 16, 4);
     pop();
 
-    // 4. 吹き出しでタスク表示
+    // 4. タスク表示
     stroke(0, 0, 0, 150);
     strokeWeight(3);
     fill(255, 255, 255, 180);
     textSize(11);
     textAlign(CENTER, CENTER);
-    text('👤 ' + this.text, finalX, finalY - 20);
+    text('👤 ' + this.text, finalX, finalY - 22);
   }
 
   isFinished() {
@@ -93,7 +93,6 @@ class OtherUserTask {
 function setup() {
   createCanvas(600, 500);
 
-  // 焚き火の位置を画面中央に設定
   fireX = width / 2;
   fireY = height / 2 + 30;
 
@@ -122,7 +121,7 @@ function setup() {
   rainNoise.connect(rainFilter);
   rainNoise.start();
 
-  // 初期メンバーを焚き火の周りに配置（別々の角度にばらす）
+  // 初期メンバーを別々の角度に固定配置
   let sampleTasks = ['読書する', '英単語 暗記', '部屋の片付け'];
   let angles = [PI * 0.25, PI * 0.75, PI * 1.6];
   for (let i = 0; i < 3; i++) {
@@ -132,16 +131,19 @@ function setup() {
 
 function draw() {
   background(bgImage);
-  fill(0, 0, 0, 130);
+  fill(0, 0, 0, 110); // 上空からの焚き火が映えるように少し明るく調整
   rectMode(CORNER);
   rect(0, 0, width, height);
 
   drawRainEffect();
 
-  // 中央の焚き火を表現する光のサークル
+  // ★真上視点用の焚き火の明滅エフェクト
+  let firePulse = sin(frameCount * 0.05) * 12;
   noStroke();
-  fill(255, 100, 0, 25 + sin(frameCount * 0.05) * 10);
-  ellipse(fireX, fireY, 150, 150);
+  fill(255, 100, 0, 20 + firePulse);
+  ellipse(fireX, fireY, 230, 230);
+  fill(255, 160, 50, 40 + firePulse);
+  ellipse(fireX, fireY, 130, 130);
 
   updateOtherTasks();
 
@@ -154,7 +156,6 @@ function draw() {
   drawHeader();
 }
 
-// 0: タイトル画面
 function drawTitleScene() {
   taskInput.show();
   startButton.show();
@@ -169,27 +170,24 @@ function drawTitleScene() {
   textSize(14);
   fill(180);
   text(
-    '5分間の集中目標を入力して「開始宣言」をすると\n焚き火を囲んでマシュマロを焼き始めます。',
+    '5分間の集中目標を入力して「開始宣言」をすると\n焚き火のそばでじっくりマシュマロを焼き始めます。',
     width / 2,
     height / 2 + 20
   );
 }
 
-// 1: タイマー・継続画面（メイン画面）
 function drawTimerScene() {
   taskInput.hide();
   startButton.hide();
   stopButton.show();
 
-  let currentRadius;
   let progress = 0;
   let timeString = '';
 
   if (!isOvertime) {
-    // 【通常モード】5分間のカウントダウン（だんだん中心へ）
+    // 【通常モード】5分間のカウントダウン
     myTimer--;
     progress = (totalDuration - myTimer) / totalDuration;
-    currentRadius = lerp(220, 70, progress);
 
     let remainingSeconds = Math.ceil(myTimer / 60);
     let displayMin = Math.floor(remainingSeconds / 60);
@@ -200,10 +198,9 @@ function drawTimerScene() {
       isOvertime = true;
     }
   } else {
-    // 【継続モード】中心の近くでキープしてカウントアップ
+    // 【継続モード】カウントアップ
     myTimer++;
     progress = 1.0;
-    currentRadius = 70;
 
     let elapsedSeconds = Math.floor(myTimer / 60);
     let displayMin = Math.floor(elapsedSeconds / 60);
@@ -211,20 +208,20 @@ function drawTimerScene() {
     timeString = '5分達成! + ' + nf(displayMin, 2) + ':' + nf(displaySec, 2);
   }
 
-  // あなたのマシュマロの角度（画面の真下：1.5 * PI = 270度 の位置から焼き始める）
-  let myAngle = HALF_PI; // 真下（下から火に向かって伸びる）
+  // あなたのマシュマロの角度（画面の真下：HALF_PI = 90度 の位置で固定）
+  let myAngle = HALF_PI;
 
-  // ゆらゆらとしなる計算
+  // その場で優しくゆらゆら揺れる計算
   let offsetWithSin = sin(frameCount * 0.02) * 15;
-  let finalX = fireX + cos(myAngle) * currentRadius + offsetWithSin;
-  let finalY = fireY + sin(myAngle) * currentRadius;
+  let finalX = fireX + cos(myAngle) * fixedRadius + offsetWithSin;
+  let finalY = fireY + sin(myAngle) * fixedRadius;
 
-  // 1. あなたの串
+  // 1. あなたの串（下から一直線に伸びる）
   stroke(139, 90, 43);
   strokeWeight(5);
-  line(fireX, height + 50, finalX, finalY); // 下から伸びる太い串
+  line(fireX + cos(myAngle) * 260, fireY + sin(myAngle) * 260, finalX, finalY);
 
-  // 2. 焼き色
+  // 2. その場でじわじわ変わる焼き色
   let r = lerp(255, 139, progress);
   let g = lerp(255, 90, progress);
   let b = lerp(255, 43, progress);
@@ -275,24 +272,24 @@ function drawTimerScene() {
   }
 
   // ------------------------------------
-  // 目標ボードとタイマー（マシュマロの手前に大きく表示）
+  // 目標ボードとタイマー（手前に大きく表示）
   // ------------------------------------
   stroke(0);
   strokeWeight(4);
   if (!isOvertime) {
     fill(255, 230, 150);
-    rect(finalX, finalY + 50, textWidth(myTaskText) + 30, 30, 8);
+    rect(finalX, finalY + 52, textWidth(myTaskText) + 30, 30, 8);
     noStroke();
     fill(50, 30, 0);
     textSize(14);
-    text('🔥 ' + myTaskText, finalX, finalY + 50);
+    text('🔥 ' + myTaskText, finalX, finalY + 52);
   } else {
     fill(130, 255, 180);
-    rect(finalX, finalY + 50, textWidth(myTaskText) + 110, 30, 8);
+    rect(finalX, finalY + 52, textWidth(myTaskText) + 110, 30, 8);
     noStroke();
     fill(20, 50, 30);
     textSize(14);
-    text('🎉 ' + myTaskText + '（こんがり！）', finalX, finalY + 50);
+    text('🎉 ' + myTaskText + '（こんがり！）', finalX, finalY + 52);
   }
 
   // タイマー表示
@@ -300,7 +297,7 @@ function drawTimerScene() {
   strokeWeight(3);
   textSize(15);
   fill(255, 255, 255, 220);
-  text(timeString, finalX, finalY + 78);
+  text(timeString, finalX, finalY + 80);
 
   rainNoise.amp(0.15, 0.5);
   rainFilter.freq(800);
@@ -327,10 +324,10 @@ function updateOtherTasks() {
     }
   }
 
-  // 誰かが新しく参加したら、空いているランダムな角度に配置
-  if (random(1) < 0.003 && otherTasks.length < 7) {
+  // 他のユーザーも、あなたと重ならない上半分寄りの角度に固定配置
+  if (random(1) < 0.003 && otherTasks.length < 6) {
     let onlineTasks = ['読書中...', '資料作成', '英単語!', '片付け', 'コード書く', '企画出し'];
-    let randomAngle = random(PI * 1.1, PI * 1.9); // あなた（真下：HALF_PI）と重ならないように、上半分寄りに配置
+    let randomAngle = random(PI * 1.1, PI * 1.9);
     otherTasks.push(new OtherUserTask(random(onlineTasks), randomAngle, false));
   }
 }
