@@ -22,7 +22,7 @@ let fixedRadius = 80;
 
 function preload() {
   // 以前の指示通り、ご用意した画像を読み込んでください
-  bgImage = loadImage('fire2.png');
+  bgImage = loadImage('fire.png');
 }
 
 // 他のユーザーのタスク（固定位置で焼いているマシュマロ）
