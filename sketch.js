@@ -19,7 +19,7 @@ let bgImage;
 let fireX, fireY;
 
 function preload() {
-  bgImage = loadImage('fire.jpg');
+  bgImage = loadImage('fire.png');
 }
 
 // 他のユーザーのタスク（焚き火を囲むマシュマロ）
