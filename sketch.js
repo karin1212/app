@@ -1,4 +1,4 @@
-// === p5.js：焚き火を囲む・5分間マシュマロ焼きタイマー（改善版） ===
+// === p5.js：焚き火を囲む・5分間マシュマロ焼きタイマー（焚き火SE版） ===
 
 let taskInput;
 let startButton;
@@ -12,9 +12,13 @@ let totalDuration = 5 * 60 * 60; // 5分間
 let isOvertime = false;
 
 let otherTasks = [];
-let rainNoise;
-let rainFilter;
 let bgImage;
+
+// === 焚き火音（サウンド合成）用変数 ===
+let fireRoarNoise; // 炎の「ゴー」という低音
+let fireRoarFilter;
+let crackleNoise; // パチパチ音用のノイズ
+let crackleEnv; // パチパチ音のエンベロープ（一瞬だけ鳴らす仕組み）
 
 // 焚き火の中心座標とマシュマロの距離
 let fireX, fireY;
@@ -86,7 +90,6 @@ class OtherUserTask {
 }
 
 function setup() {
-  // 画面サイズに合わせて自動フィット
   createCanvas(windowWidth, windowHeight);
 
   updatePositions();
@@ -108,13 +111,23 @@ function setup() {
   stopButton.mousePressed(backToTitle);
   stopButton.hide();
 
-  // 環境音の初期化
-  rainNoise = new p5.Noise('pink');
-  rainNoise.amp(0);
-  rainFilter = new p5.LowPass();
-  rainNoise.disconnect();
-  rainNoise.connect(rainFilter);
-  rainNoise.start();
+  // ★ 焚き火の音（ASMR合成）の初期化 ★
+  // 1. 炎の低音（ゴーという音）
+  fireRoarNoise = new p5.Noise('brown');
+  fireRoarNoise.amp(0);
+  fireRoarFilter = new p5.LowPass();
+  fireRoarFilter.freq(250); // 低音域に絞る
+  fireRoarNoise.disconnect();
+  fireRoarNoise.connect(fireRoarFilter);
+  fireRoarNoise.start();
+
+  // 2. パチパチとはぜる音（クラックル音）
+  crackleNoise = new p5.Noise('white');
+  crackleNoise.amp(0);
+  crackleEnv = new p5.Envelope();
+  crackleEnv.setADSR(0.001, 0.03, 0, 0.01); // 一瞬で立ち上がり一瞬で消える設定
+  crackleEnv.setRange(0.2, 0);
+  crackleNoise.start();
 
   // 初期メンバー配置
   let sampleTasks = ['読書する', '英単語 暗記', '部屋の片付け'];
@@ -124,7 +137,6 @@ function setup() {
   }
 }
 
-// ウインドウサイズが変更された時に自動追従する関数
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   updatePositions();
@@ -142,7 +154,6 @@ function updateUIPosition() {
   }
 }
 
-// Enterキーが押された時の操作を追加
 function keyPressed() {
   if (keyCode === ENTER && scene === 0) {
     startMyTimer();
@@ -155,17 +166,27 @@ function draw() {
   rectMode(CORNER);
   rect(0, 0, width, height);
 
-  // ★真ん中のオレンジの円（火の明滅エフェクト）は削除しました
-
   updateOtherTasks();
 
   if (scene === 0) {
     drawTitleScene();
   } else if (scene === 1) {
     drawTimerScene();
+    playCampfireAudio(); // ★ 焚き火の音を再生・コントロール
   }
 
   drawHeader();
+}
+
+// ★ 不定期にパチパチ音を再生するロジック ★
+function playCampfireAudio() {
+  // 炎のベース音の音量
+  fireRoarNoise.amp(0.12, 0.2);
+
+  // ランダムなタイミング（毎フレーム約5%の確率）でパチッと弾けさせる
+  if (random(1) < 0.06) {
+    crackleEnv.play(crackleNoise);
+  }
 }
 
 function drawTitleScene() {
@@ -309,9 +330,6 @@ function drawTimerScene() {
   textSize(15);
   fill(255, 255, 255, 220);
   text(timeString, finalX, finalY + 80);
-
-  rainNoise.amp(0.15, 0.5);
-  rainFilter.freq(800);
 }
 
 function updateOtherTasks() {
@@ -344,7 +362,7 @@ function drawHeader() {
   textAlign(LEFT, CENTER);
   let totalOnline = otherTasks.length + (scene === 1 ? 1 : 0);
 
-  let headerText = 'コワーキングキャンプ（現在 ' + totalOnline + ' 人で焚き火を囲み中 / 環境音: 雨）';
+  let headerText = 'コワーキングキャンプ（現在 ' + totalOnline + ' 人で焚き火を囲み中 / 環境音: 焚き火）';
   if (isOvertime && scene === 1) {
     headerText = '✨ こんがりボーナスタイム！さらに集中を深めています。';
   }
@@ -364,6 +382,6 @@ function startMyTimer() {
 }
 
 function backToTitle() {
-  rainNoise.amp(0, 0.5);
+  if (fireRoarNoise) fireRoarNoise.amp(0, 0.5);
   scene = 0;
 }
