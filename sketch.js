@@ -1,387 +1,992 @@
-// === p5.js：焚き火を囲む・5分間マシュマロ焼きタイマー（焚き火SE版） ===
+// ---------- 素材 ----------
+let backgroundImg;
+let firewoodImg;
+let fireImg;
+let bearImg;
+let rabbitImg;
+let catImg;
+let dogImg;
+let marshmallowImg;
+let myHandImg;
+let otherUsers;
 
-let taskInput;
+let marshmallowX;
+let marshmallowY;
+let marshmallowAngle;
+
+let topBackgroundImg;
+let finishBackgroundImg;
+
+// ---------- 音 ----------
+let campfireSound;
+let soundButton;
+
+// ---------- 画面 ----------
+let screen = 'top';
 let startButton;
-let stopButton;
-let controlDiv;
+let endButton;
+let retryButton;
+let returnButton;
 
-let scene = 0;
-let myTimer = 0;
-let myTaskText = '';
-let totalDuration = 5 * 60 * 60; // 5分間
-let isOvertime = false;
+// ---------- タスク ----------
+let taskInput;
+let taskName;
 
-let otherTasks = [];
-let bgImage;
+// ---------- タイマー ----------
+const workTime = 5 * 60; // 5分
+let startTime;
+//let finished = false;
+let elapsedTime = 0;
+let totalWorkTime = 0; // 累計作業時間（秒）
+let completedCount = 0; // 終了したセット数
+let completedThisRound = false; //達成処理を1回だけ行うための変数
+let showCompleteMessage = false;
 
-// === 焚き火音（サウンド合成）用変数 ===
-let fireRoarNoise; // 炎の「ゴー」という低音
-let fireRoarFilter;
-let crackleNoise; // パチパチ音用のノイズ
-let crackleEnv; // パチパチ音のエンベロープ（一瞬だけ鳴らす仕組み）
+// ---------- 左下のカウント ----------
+let marshmallowCount = 0;
 
-// 焚き火の中心座標とマシュマロの距離
-let fireX, fireY;
-let fixedRadius = 80;
+// ＋1演出用
+let showMarshmallowEffect = false;
+let marshmallowEffectStart = 0;
 
+// ---------- 時間経過で入退室 ----------
+let lastChangeTime = 0;
+let changeInterval = 30000; // 10秒
+
+// ---------- 通知 ----------
+let notificationText = '';
+let notificationStartTime = 0;
+let notificationDuration = 3000;
+
+//アニメーション
+let sparks = [];
+
+// ---------- p5 ----------
 function preload() {
-  bgImage = loadImage('fire.png');
-}
+  backgroundImg = loadImage('assets/background.png');
 
-// 他のユーザーのタスク（固定位置で焼いているマシュマロ）
-class OtherUserTask {
-  constructor(text, angle, isInitial = false) {
-    this.text = text;
-    this.timer = totalDuration;
-    this.angle = angle;
+  bearImg = loadImage('assets/bear.png');
+  rabbitImg = loadImage('assets/rabbit.png');
+  catImg = loadImage('assets/cat.png');
+  dogImg = loadImage('assets/dog.png');
 
-    if (isInitial) {
-      this.timer = random(1000, totalDuration);
-    }
-  }
+  firewoodImg = loadImage('assets/wood.png');
+  fireImg = loadImage('assets/fire.png');
 
-  update() {
-    this.timer--;
-  }
+  marshmallowImg = loadImage('assets/marshmallow_l.png');
+  myHandImg = loadImage('assets/hand.png');
 
-  display() {
-    let progress = (totalDuration - this.timer) / totalDuration;
+  campfireSound = loadSound('assets/campfire.mp3');
 
-    let x = fireX + cos(this.angle) * fixedRadius;
-    let y = fireY + sin(this.angle) * fixedRadius;
-
-    let swing = sin(frameCount * 0.015 + this.angle) * 5;
-    let finalX = x + cos(this.angle + HALF_PI) * swing;
-    let finalY = y + sin(this.angle + HALF_PI) * swing;
-
-    // 串（外側から焚き火の中心へ）
-    stroke(115, 74, 18);
-    strokeWeight(2);
-    let handX = fireX + cos(this.angle) * (min(width, height) * 0.4);
-    let handY = fireY + sin(this.angle) * (min(width, height) * 0.4);
-    line(handX, handY, finalX, finalY);
-
-    // 焼き色
-    let r = lerp(255, 139, progress);
-    let g = lerp(255, 90, progress);
-    let b = lerp(255, 43, progress);
-
-    push();
-    translate(finalX, finalY);
-    rotate(this.angle);
-    noStroke();
-    fill(r, g, b);
-    rectMode(CENTER);
-    rect(0, 0, 22, 16, 4);
-    pop();
-
-    // タスク表示
-    stroke(0, 0, 0, 150);
-    strokeWeight(3);
-    fill(255, 255, 255, 180);
-    textSize(11);
-    textAlign(CENTER, CENTER);
-    text('👤 ' + this.text, finalX, finalY - 22);
-  }
-
-  isFinished() {
-    return this.timer <= 0;
-  }
+  topBackgroundImg = loadImage('assets/top.png');
+  finishBackgroundImg = loadImage('assets/finish.png');
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
 
-  updatePositions();
+  imageMode(CENTER);
 
-  controlDiv = createDiv();
-  updateUIPosition();
+  // タスク入力欄
+  taskInput = createInput();
+  taskInput.attribute('placeholder', '取り組むタスクを宣言しよう！');
 
-  taskInput = createInput('');
-  taskInput.parent(controlDiv);
-  taskInput.attribute('placeholder', '今から5分間でやることを入力');
-  taskInput.size(220);
+  taskInput.position(width / 2 - 150, height * 0.59);
+  taskInput.size(300, 40);
 
-  startButton = createButton('オンラインで開始宣言！');
-  startButton.parent(controlDiv);
-  startButton.mousePressed(startMyTimer);
+  //トップ画面のボタン
+  startButton = createButton('5分だけやってみる');
+  startButton.position(width / 2 - 110, height * 0.59 + 75);
+  startButton.size(220, 50);
+  startButton.mousePressed(() => {
+    screen = 'work';
+    startTime = millis();
+    startButton.hide();
+    taskName = taskInput.value();
 
-  stopButton = createButton('作業を終了する（タイトルへ）');
-  stopButton.parent(controlDiv);
-  stopButton.mousePressed(backToTitle);
-  stopButton.hide();
+    totalWorkTime = 0;
+    completedCount = 0;
+    marshmallowCount = 0;
+    elapsedTime = 0;
+    completedThisRound = false;
+    startSound();
+  });
 
-  // ★ 焚き火の音（ASMR合成）の初期化 ★
-  // 1. 炎の低音（ゴーという音）
-  fireRoarNoise = new p5.Noise('brown');
-  fireRoarNoise.amp(0);
-  fireRoarFilter = new p5.LowPass();
-  fireRoarFilter.freq(250); // 低音域に絞る
-  fireRoarNoise.disconnect();
-  fireRoarNoise.connect(fireRoarFilter);
-  fireRoarNoise.start();
+  // 作業終了ボタン
+  endButton = createButton('作業を終了する');
 
-  // 2. パチパチとはぜる音（クラックル音）
-  crackleNoise = new p5.Noise('white');
-  crackleNoise.amp(0);
-  crackleEnv = new p5.Envelope();
-  crackleEnv.setADSR(0.001, 0.03, 0, 0.01); // 一瞬で立ち上がり一瞬で消える設定
-  crackleEnv.setRange(0.2, 0);
-  crackleNoise.start();
+  endButton.position(width - 210, height - 72);
+  endButton.size(180, 45);
 
-  // 初期メンバー配置
-  let sampleTasks = ['読書する', '英単語 暗記', '部屋の片付け'];
-  let angles = [PI * 0.25, PI * 0.75, PI * 1.6];
-  for (let i = 0; i < 3; i++) {
-    otherTasks.push(new OtherUserTask(random(sampleTasks), angles[i], true));
-  }
-}
+  endButton.mousePressed(() => {
+    totalWorkTime += elapsedTime;
+    screen = 'finish';
+    endButton.hide();
+    campfireSound.stop();
+    soundButton.html('🔇 音を流す');
+  });
 
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  updatePositions();
-  updateUIPosition();
-}
+  //リトライボタン
+  retryButton = createButton('もう5分やる');
 
-function updatePositions() {
-  fireX = width / 2;
-  fireY = height / 2 + 20;
-}
+  retryButton.position(width / 2 - 240, height * 0.68);
+  retryButton.size(220, 50);
 
-function updateUIPosition() {
-  if (controlDiv) {
-    controlDiv.position(width / 2 - 170, height - 60);
-  }
-}
+  retryButton.mousePressed(() => {
+    screen = 'work';
+    startTime = millis(); // ← ここでタイマーをリセット
+    retryButton.hide();
+    startSound();
+  });
 
-function keyPressed() {
-  if (keyCode === ENTER && scene === 0) {
-    startMyTimer();
-  }
+  //トップ画面に戻るボタン
+  returnButton = createButton('トップ画面に戻る');
+  returnButton.position(width / 2 + 20, height * 0.68);
+  returnButton.size(220, 50);
+
+  returnButton.mousePressed(() => {
+    screen = 'top';
+    returnButton.hide();
+  });
+
+  // ---------- 他ユーザー ----------
+  otherUsers = [
+    {
+      name: 'クマさん',
+      image: bearImg,
+      task: 'レポートを書く',
+      active: true,
+      id: 1,
+      depth: 'back'
+    },
+    {
+      name: 'ウサギさん',
+      image: rabbitImg,
+      task: 'プログラミングの勉強',
+      active: true,
+      id: 2,
+      depth: 'back'
+    },
+    {
+      name: 'ネコさん',
+      image: catImg,
+      task: '読書',
+      active: false,
+      id: 3,
+      depth: 'front'
+    },
+    {
+      name: 'イヌさん',
+      image: dogImg,
+      task: '課題を進める',
+      active: false,
+      id: 4,
+      depth: 'front'
+    }
+  ];
+
+  // 作業開始
+  startTime = millis();
+
+  marshmallowX = width / 2;
+  marshmallowY = height - 250;
+  marshmallowAngle = 0;
+
+  // 音ボタン
+  soundButton = createButton('🔇 音を流す');
+  soundButton.position(width - 210, height - 120);
+  soundButton.size(180, 45);
+  soundButton.mousePressed(toggleSound);
+
+  setupSparks();
 }
 
 function draw() {
-  background(bgImage);
-  fill(0, 0, 0, 110);
-  rectMode(CORNER);
-  rect(0, 0, width, height);
-
-  updateOtherTasks();
-
-  if (scene === 0) {
-    drawTitleScene();
-  } else if (scene === 1) {
-    drawTimerScene();
-    playCampfireAudio(); // ★ 焚き火の音を再生・コントロール
-  }
-
-  drawHeader();
-}
-
-// ★ 不定期にパチパチ音を再生するロジック ★
-function playCampfireAudio() {
-  // 炎のベース音の音量
-  fireRoarNoise.amp(0.12, 0.2);
-
-  // ランダムなタイミング（毎フレーム約5%の確率）でパチッと弾けさせる
-  if (random(1) < 0.06) {
-    crackleEnv.play(crackleNoise);
+  if (screen === 'top') {
+    startButton.show();
+    taskInput.show();
+    endButton.hide();
+    retryButton.hide();
+    returnButton.hide();
+    soundButton.hide();
+    drawTopScreen();
+  } else if (screen === 'work') {
+    endButton.show();
+    retryButton.hide();
+    returnButton.hide();
+    soundButton.show();
+    taskInput.hide();
+    drawWorkScreen();
+  } else if (screen === 'finish') {
+    endButton.hide();
+    retryButton.show();
+    returnButton.show();
+    taskInput.hide();
+    soundButton.hide();
+    drawFinishedScreen();
   }
 }
 
-function drawTitleScene() {
-  taskInput.show();
-  startButton.show();
-  stopButton.hide();
+//==============================
+//トップ画面
+//==============================
+function drawTopScreen() {
+  // 背景
+  drawBackground(topBackgroundImg);
 
-  fill(250);
-  noStroke();
-  textSize(22);
+  // メッセージ
+  fill(241, 229, 200);
+
   textAlign(CENTER, CENTER);
-  text('焚き火マシュマロ・コワーキング', width / 2, height / 2 - 50);
 
-  textSize(14);
-  fill(180);
-  text(
-    '5分間の集中目標を入力して「開始宣言（またはEnter）」を押すと\n焚き火のそばでじっくりマシュマロを焼き始めます。',
-    width / 2,
-    height / 2 + 10
-  );
+  textSize(100);
+
+  text('Focus Camp', width / 2, height * 0.15);
 }
 
-function drawTimerScene() {
-  taskInput.hide();
-  startButton.hide();
-  stopButton.show();
+//==============================
+//作業画面
+//==============================
 
-  let progress = 0;
-  let timeString = '';
+function drawWorkScreen() {
+  elapsedTime = floor((millis() - startTime) / 1000);
+  if (elapsedTime >= workTime && !completedThisRound) {
+    totalWorkTime += workTime;
+    completedCount++;
+    showCompleteMessage = true;
+    completedThisRound = true;
 
-  if (!isOvertime) {
-    myTimer--;
-    progress = (totalDuration - myTimer) / totalDuration;
+    // マシュマロを1個焼いた
+    marshmallowCount++;
 
-    let remainingSeconds = Math.ceil(myTimer / 60);
-    let displayMin = Math.floor(remainingSeconds / 60);
-    let displaySec = remainingSeconds % 60;
-    timeString = nf(displayMin, 2) + ':' + nf(displaySec, 2);
+    // ＋1演出を開始
+    showMarshmallowEffect = true;
+    marshmallowEffectStart = millis();
 
-    if (myTimer <= 0) {
-      isOvertime = true;
-    }
-  } else {
-    myTimer++;
-    progress = 1.0;
-
-    let elapsedSeconds = Math.floor(myTimer / 60);
-    let displayMin = Math.floor(elapsedSeconds / 60);
-    let displaySec = elapsedSeconds % 60;
-    timeString = '5分達成! + ' + nf(displayMin, 2) + ':' + nf(displaySec, 2);
+    startNextRound();
   }
 
-  let myAngle = HALF_PI;
+  updateUsers();
 
-  let offsetWithSin = sin(frameCount * 0.02) * 15;
-  let finalX = fireX + cos(myAngle) * fixedRadius + offsetWithSin;
-  let finalY = fireY + sin(myAngle) * fixedRadius;
+  // 1. 背景
+  drawBackground(backgroundImg);
 
-  // 自分の串
-  stroke(139, 90, 43);
-  strokeWeight(5);
-  line(
-    fireX + cos(myAngle) * (min(width, height) * 0.45),
-    fireY + sin(myAngle) * (min(width, height) * 0.45),
-    finalX,
-    finalY
-  );
+  // 2. 他ユーザー
+  drawUsers();
 
-  // 焼き色
-  let r = lerp(255, 139, progress);
-  let g = lerp(255, 90, progress);
-  let b = lerp(255, 43, progress);
+  // 3. 焚き火
+  drawFirewood();
+  drawFire();
+  drawSparks(width * 0.5, height * 0.61);
 
-  // マシュマロ本体
-  noStroke();
-  fill(r, g, b);
-  rectMode(CENTER);
-  rect(finalX, finalY, 65, 50, 12);
+  // 4. 自分のマシュマロ
+  drawMyStick();
+  drawMyHand();
+  drawMyMarshmallow();
 
-  // 顔の描画
+  // 5. UI
+  drawTopUI();
+  drawTimer();
+  drawTaskUI();
+  //drawEndButton();
+
+  // ==============================
+  // 6. 5分終了
+  // ==============================
+
+  if (getRemainingTime() <= 0 && !finished) {
+    screen = 'finish';
+  }
+
+  if (showCompleteMessage) {
+    drawCompleteMessage();
+    /*fill('#F1E5C8');
+    textAlign(CENTER, CENTER);
+    textSize(25);
+    text('5分達成！', width / 2, height * 0.25);*/
+  }
+
+  // 左下のカウント
+  drawMarshmallowCount();
+  // ＋1演出
+  drawMarshmallowEffect();
+
+  // 通知
+  drawNotification();
+}
+
+// =================================
+// 背景
+// =================================
+
+function drawBackground(img) {
+  imageMode(CENTER);
+  image(img, width / 2, height / 2, width, height);
+  //imageMode(CORNER);
+}
+
+// 他ユーザー
+/*function drawUsers() {
+  let s = min(width / 1100, height / 700);
+
+  // クマ
+  drawCharacter(bearImg, width * 0.3, height * 0.5, 0.65 * s, 0.65 * s, 1);
+  drawUserStick(width * 0.35, height * 0.43, 0.3);
+  drawUserMarshmallow(width * 0.343, height * 0.48, 0.3);
+
+  // ウサギ
+  drawCharacter(rabbitImg, width * 0.68, height * 0.48, 0.65 * s, 0.65 * s, 2);
+  drawUserStick(width * 0.632, height * 0.42, -0.3);
+  drawUserMarshmallow(width * 0.64, height * 0.47, -0.3);
+
+  // ネコ
+  drawCharacter(catImg, width * 0.3, height * 0.68, 0.65 * s, 0.65 * s, 3);
+  drawUserStick(width * 0.348, height * 0.6, 0.3);
+  drawUserMarshmallow(width * 0.341, height * 0.65, 0.3);
+
+  // イヌ
+  drawCharacter(dogImg, width * 0.68, height * 0.67, 0.65 * s, 0.65 * s, 4);
+  drawUserStick(width * 0.628, height * 0.58, -0.3);
+  drawUserMarshmallow(width * 0.636, height * 0.63, -0.3);
+}*/
+
+function drawOtherUser(user, index) {
+  let s = min(width / 1100, height / 700);
+
+  let positions = [
+    {
+      x: width * 0.3,
+      y: height * 0.5,
+      stickX: width * 0.35,
+      stickY: height * 0.43,
+      marshmallowX: width * 0.343,
+      marshmallowY: height * 0.48,
+      direction: 0.3,
+      depth: 'back'
+    },
+    {
+      x: width * 0.68,
+      y: height * 0.48,
+      stickX: width * 0.632,
+      stickY: height * 0.42,
+      marshmallowX: width * 0.64,
+      marshmallowY: height * 0.47,
+      direction: -0.3,
+      depth: 'back'
+    },
+    {
+      x: width * 0.3,
+      y: height * 0.68,
+      stickX: width * 0.348,
+      stickY: height * 0.6,
+      marshmallowX: width * 0.341,
+      marshmallowY: height * 0.65,
+      direction: 0.3,
+      depth: 'front'
+    },
+    {
+      x: width * 0.68,
+      y: height * 0.67,
+      stickX: width * 0.628,
+      stickY: height * 0.58,
+      marshmallowX: width * 0.636,
+      marshmallowY: height * 0.63,
+      direction: -0.3,
+      depth: 'front'
+    }
+  ];
+
+  let pos = positions[index];
+
+  // 動物
+  drawCharacter(user.image, pos.x, pos.y, 0.65 * s, 0.65 * s, user.id);
+
+  // 棒
+  drawUserStick(pos.stickX, pos.stickY, pos.direction);
+
+  // マシュマロ
+  drawUserMarshmallow(pos.marshmallowX, pos.marshmallowY, pos.direction);
+
+  // タスクバブル
+  if (pos.depth === 'back') {
+    drawTaskBubble(user, pos.x, pos.y - 120, false);
+  } else {
+    drawTaskBubble(user, pos.x, pos.y + 120, true);
+  }
+}
+
+function drawUsers() {
+  for (let i = 0; i < otherUsers.length; i++) {
+    if (otherUsers[i].active) {
+      drawOtherUser(otherUsers[i], i);
+    }
+  }
+}
+
+// =================================
+// タスクバブル
+// =================================
+function drawTaskBubble(user, x, y, isBack) {
+  let bubbleWidth = 190;
+  let bubbleHeight = 48;
+
   push();
-  translate(finalX, finalY);
-  if (!isOvertime) {
-    fill(40);
-    ellipse(-14, -3, 5, 7);
-    ellipse(14, -3, 5, 7);
-    stroke(40);
-    strokeWeight(2);
-    noFill();
-    arc(0, 5, 6, 6, 0, PI);
-  } else {
-    stroke(60, 30, 0);
-    strokeWeight(3);
-    noFill();
-    arc(-14, -5, 8, 8, PI, 0);
-    arc(14, -5, 8, 8, PI, 0);
-    fill(150, 40, 20);
-    strokeWeight(2);
-    arc(0, 3, 12, 10, 0, PI, CHORD);
-    noStroke();
-    fill(255, 150, 150, 200);
-    ellipse(-22, 5, 8, 5);
-    ellipse(22, 5, 8, 5);
-  }
-  pop();
 
-  // ほかほか湯気エフェクト
-  if (isOvertime) {
-    noStroke();
-    fill(255, 255, 255, 80);
-    for (let i = 0; i < 3; i++) {
-      let steamY = finalY - 35 - ((frameCount + i * 40) % 60);
-      let steamX = finalX + sin(frameCount * 0.05 + i) * 6;
-      let steamSize = map((frameCount + i * 40) % 60, 0, 60, 10, 2);
-      ellipse(steamX, steamY, steamSize, steamSize);
-    }
-  }
-
-  // 目標ボードとタイマー
-  stroke(0);
-  strokeWeight(4);
-  if (!isOvertime) {
-    fill(255, 230, 150);
-    rect(finalX, finalY + 52, textWidth(myTaskText) + 30, 30, 8);
-    noStroke();
-    fill(50, 30, 0);
-    textSize(14);
-    text('🔥 ' + myTaskText, finalX, finalY + 52);
-  } else {
-    fill(130, 255, 180);
-    rect(finalX, finalY + 52, textWidth(myTaskText) + 110, 30, 8);
-    noStroke();
-    fill(20, 50, 30);
-    textSize(14);
-    text('🎉 ' + myTaskText + '（こんがり！）', finalX, finalY + 52);
-  }
-
-  // タイマー表示
-  stroke(0);
-  strokeWeight(3);
-  textSize(15);
-  fill(255, 255, 255, 220);
-  text(timeString, finalX, finalY + 80);
-}
-
-function updateOtherTasks() {
-  for (let i = otherTasks.length - 1; i >= 0; i--) {
-    otherTasks[i].update();
-    otherTasks[i].display();
-    if (otherTasks[i].isFinished()) {
-      otherTasks.splice(i, 1);
-    }
-  }
-
-  if (random(1) < 0.003 && otherTasks.length < 6) {
-    let onlineTasks = ['読書中...', '資料作成', '英単語!', '片付け', 'コード書く', '企画出し'];
-    let randomAngle = random(PI * 1.1, PI * 1.9);
-    otherTasks.push(new OtherUserTask(random(onlineTasks), randomAngle, false));
-  }
-}
-
-function drawHeader() {
-  fill(20, 25, 35, 220);
-  noStroke();
-  rectMode(CORNER);
-  rect(0, 0, width, 40);
-
-  fill(0, 255, 150);
-  ellipse(25, 20, 10, 10);
-
-  fill(230);
+  rectMode(CENTER);
+  textAlign(CENTER, CENTER);
   textSize(14);
+
+  fill(255, 248, 225);
+  stroke(100, 75, 50);
+  strokeWeight(2);
+  rect(x, y, bubbleWidth, bubbleHeight, 12);
+
+  // 吹き出しのしっぽ
+  fill(255, 248, 225);
+  noStroke();
+
+  if (isBack) {
+    // 上向き
+    triangle(x - 12, y - bubbleHeight / 2 + 2, x + 12, y - bubbleHeight / 2 + 2, x, y - bubbleHeight / 2 - 14);
+  } else {
+    // 下向き
+    triangle(x - 12, y + bubbleHeight / 2 - 2, x + 12, y + bubbleHeight / 2 - 2, x, y + bubbleHeight / 2 + 14);
+  }
+
+  // タスク文字
+  fill(70, 50, 40);
+  text(user.task, x, y);
+
+  pop();
+}
+
+// =================================
+// 動物
+// =================================
+
+function drawCharacter(img, x, y, scaleX, scaleY, id) {
+  // ゆっくり上下に動かす
+  let movement = sin(frameCount * 0.025 + id) * 3;
+
+  image(img, x, y + movement, img.width * scaleX, img.height * scaleY);
+}
+
+//================================
+// ユーザーの状態更新
+//================================
+
+function updateUsers() {
+  if (millis() - lastChangeTime > changeInterval) {
+    changeUserStatus();
+    lastChangeTime = millis();
+  }
+}
+
+function changeUserStatus() {
+  let index = floor(random(otherUsers.length));
+  let user = otherUsers[index];
+
+  // 入室・退室を切り替える
+  user.active = !user.active;
+
+  // 状態に合わせて通知を表示
+  if (user.active) {
+    showNotification(user.name + 'が入室しました');
+  } else {
+    showNotification(user.name + 'が退室しました');
+  }
+}
+
+// =================================
+// 通知
+// =================================
+function showNotification(text) {
+  notificationText = text;
+  notificationStartTime = millis();
+}
+
+function drawNotification() {
+  if (notificationText === '') return;
+
+  let elapsed = millis() - notificationStartTime;
+
+  if (elapsed > notificationDuration) {
+    notificationText = '';
+    return;
+  }
+
+  push();
+
+  rectMode(CENTER);
+  noStroke();
+  fill(70, 50, 40, 220);
+  rect(width / 2, 220, 360, 55, 15);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(20);
+  text(notificationText, width / 2, 220);
+
+  pop();
+}
+
+// =================================
+// 焚き火
+// =================================
+
+function drawFirewood() {
+  image(firewoodImg, width * 0.5, height * 0.61, 180, 100);
+}
+
+function drawFire() {
+  drawFireAnimated(width * 0.5, height * 0.51, 130, 150);
+}
+
+// =================================
+// 自分の手
+// =================================
+
+function drawMyHand() {
+  push();
+  imageMode(CORNER);
+
+  let handW = 150;
+  let handH = 220;
+
+  image(myHandImg, width / 2 - handW / 2, height - handH + 80, handW, handH);
+
+  pop();
+}
+
+/*function drawMyHand() {
+  push();
+  translate(marshmallowX, marshmallowY);
+  rotate(marshmallowAngle);
+
+  image(myHandImg, -75, 50, 150, 220);
+
+  pop();
+}*/
+
+// ------------------------------
+// マシュマロ
+// ------------------------------
+
+function drawMyStick() {
+  push();
+
+  translate(marshmallowX, marshmallowY);
+  rotate(marshmallowAngle);
+
+  stroke(90, 65, 50);
+  strokeWeight(10);
+  line(0, 50, 0, 130);
+
+  pop();
+  // 棒を描く
+}
+
+function drawMyMarshmallow() {
+  push();
+
+  translate(marshmallowX, marshmallowY);
+  rotate(marshmallowAngle);
+
+  // 経過時間から焼き加減を計算
+  let progress = constrain(elapsedTime / workTime, 0, 1);
+
+  // 白 → 黄色 → 茶色へ変化
+  let marshmallowColor;
+
+  if (progress < 0.4) {
+    marshmallowColor = lerpColor(color('#F5F0E1'), color('#E7C875'), progress / 0.4);
+  } else {
+    marshmallowColor = lerpColor(color('#E7C875'), color('#9A542F'), (progress - 0.4) / 0.6);
+  }
+
+  noStroke();
+  fill(marshmallowColor);
+  rectMode(CENTER);
+  rect(0, 20, 60, 95, 30);
+
+  pop();
+  // マシュマロを描く
+}
+
+/*push();
+
+  imageMode(CENTER);
+
+  image(marshmallowImg, x, y, marshmallowImg.width * 0.18 * s, marshmallowImg.height * 0.18 * s);
+
+  // 焼け具合の色を重ねる
+  if (progress > 0.3) {
+    let brownAlpha = map(progress, 0.3, 1, 0, 130);
+
+    fill(120, 75, 35, brownAlpha);
+    noStroke();
+
+    ellipse(x, y, marshmallowImg.width * 0.13 * s, marshmallowImg.height * 0.13 * s);
+  }
+
+  pop();
+}*/
+
+// =================================
+//他ユーザーのマシュマロ
+// =================================
+
+function drawUserStick(x, y, angle) {
+  push();
+
+  translate(x, y);
+  rotate(angle);
+
+  stroke(90, 65, 50);
+  strokeWeight(10);
+  line(0, 50, 0, 100);
+
+  pop();
+  // 棒を描く
+}
+
+function drawUserMarshmallow(x, y, angle) {
+  push();
+
+  translate(x, y);
+  rotate(angle);
+
+  noStroke();
+  fill(245, 240, 225);
+  rectMode(CENTER);
+  rect(0, 0, 20, 35, 12);
+
+  pop();
+}
+
+// =================================
+// 上部UI
+// =================================
+
+function drawTopUI() {
+  // 左上
+  fill(241, 229, 200);
+  noStroke();
+
+  textAlign(LEFT, TOP);
+  textSize(24);
+
+  text('🔥 Focus Camp', 35, 30);
+
+  // 作業人数
+  fill(216, 199, 165);
+  textSize(16);
+
+  text('4人が集中しています', 38, 62);
+}
+
+// =================================
+// タイマー
+// =================================
+
+function drawTimer() {
+  let remaining = getRemainingTime();
+
+  let minutes = floor(remaining / 60);
+
+  let seconds = remaining % 60;
+
+  let timeText = nf(minutes, 2) + ':' + nf(seconds, 2);
+
+  fill(241, 229, 200);
+  noStroke();
+
+  textAlign(CENTER, CENTER);
+
+  textSize(min(width, height) * 0.055);
+
+  text(timeText, width * 0.5, height * 0.16);
+}
+
+// =================================
+// 残り時間
+// =================================
+
+function getRemainingTime() {
+  let elapsed = floor((millis() - startTime) / 1000);
+
+  return max(0, workTime - elapsed);
+}
+
+// =================================
+// タスク
+// =================================
+
+function drawTaskUI() {
+  let boxWidth = min(width * 0.42, 500);
+
+  let boxHeight = 55;
+
+  let x = width / 2;
+  let y = height * 0.08;
+
+  // 背景
+  fill(35, 23, 13, 220);
+  noStroke();
+
+  rectMode(CENTER);
+
+  rect(x, y, boxWidth, boxHeight, 12);
+
+  // タスク
+  fill(241, 229, 200);
+
+  textAlign(CENTER, CENTER);
+  textSize(18);
+
+  text(taskName, x, y);
+}
+
+// =================================
+//達成時間表示
+// =================================
+function drawCompleteMessage() {
+  let totalMinutes = totalWorkTime / 60;
+
+  fill('#F1E5C8');
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(25);
+
+  text(totalMinutes + '分達成！', width / 2, height * 0.25);
+}
+
+// =================================
+// ＋1演出
+// =================================
+
+function drawMarshmallowEffect() {
+  if (!showMarshmallowEffect) return;
+
+  let elapsed = millis() - marshmallowEffectStart;
+  let duration = 1500;
+
+  if (elapsed >= duration) {
+    showMarshmallowEffect = false;
+    return;
+  }
+
+  let progress = elapsed / duration;
+
+  // 最初にぴょんと上がって、その後少し下がる
+  let jumpY;
+
+  if (progress < 0.35) {
+    // 上に跳ねる
+    let jumpProgress = progress / 0.35;
+    jumpY = -sin((jumpProgress * PI) / 2) * 25;
+  } else {
+    // 少し下がって元の位置に戻る
+    let fallProgress = (progress - 0.35) / 0.65;
+    jumpY = -25 + sin((fallProgress * PI) / 2) * 25;
+  }
+
+  // 最後にふわっと消える
+  let alpha = 255;
+
+  if (progress > 0.65) {
+    alpha = map(progress, 0.65, 1, 255, 0);
+  }
+
+  push();
+
+  textAlign(CENTER, CENTER);
+  textStyle(BOLD);
+
+  // 「5分達成！」のすぐ下
+  let messageY = height / 2 + 45;
+
+  fill(255, 235, 170, alpha);
+  textSize(24);
+
+  text('+1 マシュマロ！', width / 2, messageY + jumpY);
+
+  pop();
+}
+
+// =================================
+// 左下のマシュマロカウント
+// =================================
+function drawMarshmallowCount() {
+  push();
+
+  imageMode(CORNER);
+  image(marshmallowImg, 35, height - 85, 50, 50);
+
   textAlign(LEFT, CENTER);
-  let totalOnline = otherTasks.length + (scene === 1 ? 1 : 0);
+  textSize(22);
+  textStyle(BOLD);
+  fill(255);
 
-  let headerText = 'コワーキングキャンプ（現在 ' + totalOnline + ' 人で焚き火を囲み中 / 環境音: 焚き火）';
-  if (isOvertime && scene === 1) {
-    headerText = '✨ こんがりボーナスタイム！さらに集中を深めています。';
-  }
-  text(headerText, 45, 20);
+  text('× ' + marshmallowCount, 95, height - 60);
+
+  pop();
 }
 
-function startMyTimer() {
-  let inputVal = taskInput.value().trim();
-  if (inputVal !== '') {
-    myTaskText = inputVal;
-    myTimer = totalDuration;
-    isOvertime = false;
-    taskInput.value('');
-    userStartAudio();
-    scene = 1;
+// =================================
+// 次のラウンド開始
+// =================================
+function startNextRound() {
+  startTime = millis();
+  elapsedTime = 0;
+  completedThisRound = false;
+}
+
+// =================================
+// 作業終了ボタン
+// =================================
+
+/*function drawEndButton() {
+  let buttonWidth = 180;
+  let buttonHeight = 45;
+
+  let x = width - 120;
+  let y = height - 50;
+
+  fill(121, 80, 37);
+  noStroke();
+
+  rectMode(CENTER);
+
+  rect(x, y, buttonWidth, buttonHeight, 10);
+
+  fill(241, 229, 200);
+
+  textAlign(CENTER, CENTER);
+  textSize(15);
+
+  text('作業を終了する', x, y);
+}*/
+
+// =================================
+// 5分終了画面
+// =================================
+
+function drawFinishedScreen() {
+  // 背景
+  drawBackground(finishBackgroundImg);
+
+  // メッセージ
+  fill('#795025');
+  textAlign(CENTER, CENTER);
+
+  textSize(45);
+  text('5分間、おつかれさま！', width / 2, height * 0.35);
+
+  textSize(25);
+  text('マシュマロがこんがり焼けました 🔥', width / 2, height * 0.42);
+
+  // 作業結果
+  /*imageMode(CORNER);
+  image(marshmallowImg, width / 2, height * 0.52, 50, 50);
+  textSize(40);
+  text(' 焼いたマシュマロ：' + completedCount + '個', width / 2, height * 0.52);*/
+
+  textSize(30);
+
+  let textContent = '焼いたマシュマロ：' + completedCount + '個';
+  let messageWidth = textWidth(textContent);
+
+  let imageSize = 30;
+  let gap = 8;
+
+  let totalWidth = imageSize + gap + messageWidth;
+  let startX = width / 2 - totalWidth / 2;
+
+  // マシュマロ画像
+  image(marshmallowImg, startX + imageSize / 2, height * 0.533 - imageSize / 2, imageSize, imageSize);
+
+  // 文字
+  text(textContent, startX + imageSize + gap + messageWidth / 2, height * 0.52);
+
+  let minutes = floor(totalWorkTime / 60);
+  let seconds = totalWorkTime % 60;
+
+  text('⏱ 作業時間：' + minutes + '分' + seconds + '秒', width / 2, height * 0.58);
+}
+
+// =================================
+// 画面サイズ変更
+// =================================
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+// =================================
+// 音
+// =================================
+function startSound() {
+  if (!campfireSound.isPlaying()) {
+    campfireSound.loop();
+    campfireSound.setVolume(0.2);
+    soundButton.html('🔊 音を止める');
   }
 }
 
-function backToTitle() {
-  if (fireRoarNoise) fireRoarNoise.amp(0, 0.5);
-  scene = 0;
+function toggleSound() {
+  if (campfireSound.isPlaying()) {
+    campfireSound.stop();
+    soundButton.html('🔇 音を流す');
+  } else {
+    startSound();
+  }
+}
+
+// =================================
+// 焚き火アニメーション
+// =================================
+function drawFireAnimated(x, y, w, h) {
+  let t = millis() * 0.005;
+
+  let scaleX = 1 + sin(t) * 0.04;
+  let scaleY = 1 + sin(t * 1.3) * 0.06;
+
+  push();
+  imageMode(CENTER);
+  translate(x, y);
+  scale(scaleX, scaleY);
+  image(fireImg, 0, 0, w, h);
+  pop();
+}
+
+function setupSparks() {
+  for (let i = 0; i < 12; i++) {
+    sparks.push({
+      x: random(-25, 25),
+      y: random(0, 20),
+      speed: random(0.3, 0.8),
+      size: random(2, 5),
+      alpha: random(100, 220)
+    });
+  }
+}
+
+function drawSparks(x, y) {
+  push();
+  noStroke();
+
+  for (let spark of sparks) {
+    spark.y -= spark.speed;
+
+    if (spark.y < -70) {
+      spark.y = random(0, 20);
+      spark.x = random(-25, 25);
+    }
+
+    fill(255, 210, 100, spark.alpha);
+    circle(x + spark.x, y + spark.y, spark.size);
+  }
+
+  pop();
 }
