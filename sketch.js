@@ -76,7 +76,7 @@ function preload() {
   marshmallowImg = loadImage('assets/marshmallow_l.png');
   myHandImg = loadImage('assets/hand.png');
 
-  campfireSound = loadSound('assets/campfire.mp3');
+  //campfireSound = loadSound('assets/campfire.mp3');
 
   topBackgroundImg = loadImage('assets/top.png');
   finishBackgroundImg = loadImage('assets/finish.png');
@@ -231,7 +231,7 @@ function draw() {
 //==============================
 //トップ画面
 //==============================
-/*function drawTopScreen() {
+function drawTopScreen() {
   // 背景
   drawBackground(topBackgroundImg);
 
@@ -242,15 +242,6 @@ function draw() {
 
   textSize(100);
 
-  text('Focus Camp', width / 2, height * 0.15);
-}*/
-
-function drawTopScreen() {
-  background(100, 180, 220);
-
-  fill(255);
-  textAlign(CENTER, CENTER);
-  textSize(32);
   text('Focus Camp', width / 2, height * 0.15);
 }
 
