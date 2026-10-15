@@ -76,7 +76,7 @@ function preload() {
   marshmallowImg = loadImage('assets/marshmallow_l.png');
   myHandImg = loadImage('assets/hand.png');
 
-  //campfireSound = loadSound('assets/campfire.mp3');
+  campfireSound = loadSound('assets/campfire.mp3');
 
   topBackgroundImg = loadImage('assets/top.png');
   finishBackgroundImg = loadImage('assets/finish.png');
