@@ -202,6 +202,7 @@ function setup() {
 }
 
 function draw() {
+  console.log('draw実行中', screen);
   if (screen === 'top') {
     startButton.show();
     taskInput.show();
@@ -230,7 +231,7 @@ function draw() {
 //==============================
 //トップ画面
 //==============================
-function drawTopScreen() {
+/*function drawTopScreen() {
   // 背景
   drawBackground(topBackgroundImg);
 
@@ -241,6 +242,15 @@ function drawTopScreen() {
 
   textSize(100);
 
+  text('Focus Camp', width / 2, height * 0.15);
+}*/
+
+function drawTopScreen() {
+  background(100, 180, 220);
+
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(32);
   text('Focus Camp', width / 2, height * 0.15);
 }
 
