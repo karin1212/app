@@ -87,6 +87,11 @@ function setup() {
 
   imageMode(CENTER);
 
+  //20261016 テスト
+  console.log('画面サイズ:', windowWidth, windowHeight);
+  console.log('キャンバスサイズ:', width, height);
+  console.log('表示倍率:', pixelDensity());
+
   // タスク入力欄
   taskInput = createInput();
   taskInput.attribute('placeholder', '取り組むタスクを宣言しよう！');
